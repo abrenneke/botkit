@@ -129,6 +129,11 @@ export interface BotkitMessage {
     incoming_message: Activity;
 
     /**
+     * The 'error' event will set this property to the error the occurred.
+     */
+    error: Error | undefined;
+
+    /**
      * Any additional fields found in the incoming payload from the messaging platform.
      */
     [key: string]: any;
@@ -753,21 +758,26 @@ export class Botkit {
         // Spawn a bot worker with the dialogContext
         const bot = await this.spawn(dialogContext);
 
-        await this.middleware.ingest.run(bot, message);
-        await this.middleware.receive.run(bot, message);
+        try {
+            await this.middleware.ingest.run(bot, message);
+            await this.middleware.receive.run(bot, message);
 
-        const interrupt_results = await this.listenForInterrupts(bot, message);
+            const interrupt_results = await this.listenForInterrupts(bot, message);
 
-        if (interrupt_results === false) {
-            // Continue dialog if one is present
-            const dialog_results = await dialogContext.continueDialog();
-            if (dialog_results && dialog_results.status === DialogTurnStatus.empty) {
-                await this.processTriggersAndEvents(bot, message);
+            if (interrupt_results === false) {
+                // Continue dialog if one is present
+                const dialog_results = await dialogContext.continueDialog();
+                if (dialog_results && dialog_results.status === DialogTurnStatus.empty) {
+                    await this.processTriggersAndEvents(bot, message);
+                }
             }
-        }
 
-        // make sure changes to the state get persisted after the turn is over.
-        await this.saveState(bot);
+            // make sure changes to the state get persisted after the turn is over.
+            await this.saveState(bot);
+        } catch (err) {
+            message.error = err;
+            await this.trigger('error', bot, message);
+        }
     }
 
     /**
