@@ -723,6 +723,10 @@ export class BotkitConversation<O extends object = {}> extends Dialog<O> {
         state.thread = thread_name;
         // Create step context
         const nextCalled = false;
+
+        if (!this.script[thread_name])
+            throw new Error(`Unknown thread ${thread_name}`);
+
         const step = {
             index: index,
             threadLength: this.script[thread_name].length,
